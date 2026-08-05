@@ -1,0 +1,10 @@
+{
+  "name": "Remix Beyblade RPM Detector Release",
+  "description": "透過 BLE 接收陀螺儀/光電感測器數據並動態繪製戰鬥陀螺轉速 (RPM) 折線圖的專業工具，支援實體 BLE 連線與高精度物理模擬器。",
+  "requestFramePermissions": [
+    "bluetooth"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
