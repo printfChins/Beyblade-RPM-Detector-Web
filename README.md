@@ -185,15 +185,6 @@ Beyblade-RPM-Detector
     └── Mechanical design files
 ```
 
----
-
-## License
-
-Individual source files currently include their applicable SPDX license identifiers.
-
-Refer to the repository files and license documentation for licensing information.
-
----
 
 # 中文說明
 
@@ -420,8 +411,3 @@ Beyblade-RPM-Detector
 
 ---
 
-## 授權
-
-目前部分原始碼檔案內包含各自的 SPDX License Identifier。
-
-實際授權方式請依 Repository 中的授權文件與原始碼標示為準。
