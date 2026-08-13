@@ -21,29 +21,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # [新增] 取得 Repository 原始碼
+      # [保留] 取得 Repository 原始碼
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # [新增] 建立 Node.js 環境
+      # [保留] 建立 Node.js 環境
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # [新增] 安裝相依套件
+      # [保留] 安裝相依套件
       - name: Install dependencies
         run: npm install
 
-      # [新增] 執行 Vite Build
+      # [保留] 執行 Vite Build
       - name: Build
         run: npm run build
 
-      # [新增] 設定 GitHub Pages
+      # [修改]
+      # 第一次部署時若 GitHub Pages 尚未建立，
+      # 自動啟用並初始化 Pages Site。
       - name: Setup Pages
         uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
-      # [新增] 上傳 dist 靜態網站
+      # [保留] 上傳 Vite 產生的 dist 靜態網站
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -58,7 +62,7 @@ jobs:
     needs: build
 
     steps:
-      # [新增] 部署至 GitHub Pages
+      # [保留] 部署至 GitHub Pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
