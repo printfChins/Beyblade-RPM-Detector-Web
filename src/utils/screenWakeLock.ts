@@ -1,6 +1,7 @@
-// [新增] 螢幕防休眠控制
-// 使用標準 Screen Wake Lock API，避免頁面使用期間因閒置而自動關閉螢幕。
-// Wake Lock 在頁面進入背景時會被瀏覽器釋放，因此 visibilitychange 回到前景時需重新取得。
+// [修改] 螢幕防休眠控制
+// 一般瀏覽器使用標準 Screen Wake Lock API。
+// Bluefy 額外使用 setScreenDimEnabled(false)，避免 iPhone / iPad 因閒置進入休眠。
+// 頁面進入背景時恢復允許休眠，回到前景時再重新啟用防休眠。
 
 type WakeLockSentinelLike = EventTarget & {
   released: boolean;
@@ -13,8 +14,62 @@ type WakeLockNavigator = Navigator & {
   };
 };
 
+// [新增] Bluefy 專用 Bluetooth 擴充 API。
+// Bluefy 3.8.2 起提供 bluetooth.setScreenDimEnabled(enabled)。
+type BluefyBluetooth = {
+  setScreenDimEnabled?: (enabled: boolean) => void | Promise<void>;
+};
+
+type BluefyNavigator = Navigator & {
+  bluetooth?: BluefyBluetooth;
+};
+
+type BluefyGlobal = typeof globalThis & {
+  bluetooth?: BluefyBluetooth;
+};
+
 let wakeLockSentinel: WakeLockSentinelLike | null = null;
 let initialized = false;
+
+// [新增] 取得 Bluefy 專用 Bluetooth API。
+// 優先檢查 navigator.bluetooth，同時保留 global bluetooth 相容路徑。
+function getBluefyBluetooth(): BluefyBluetooth | null {
+  const navigatorBluetooth = (navigator as BluefyNavigator).bluetooth;
+
+  if (typeof navigatorBluetooth?.setScreenDimEnabled === 'function') {
+    return navigatorBluetooth;
+  }
+
+  const globalBluetooth = (globalThis as BluefyGlobal).bluetooth;
+
+  if (typeof globalBluetooth?.setScreenDimEnabled === 'function') {
+    return globalBluetooth;
+  }
+
+  return null;
+}
+
+// [新增] Bluefy 螢幕休眠控制。
+// enabled = false：禁止螢幕因閒置變暗 / 休眠。
+// enabled = true ：恢復 Bluefy / iOS 原本的螢幕休眠行為。
+async function setBluefyScreenDimEnabled(enabled: boolean): Promise<void> {
+  const bluetooth = getBluefyBluetooth();
+
+  if (!bluetooth?.setScreenDimEnabled) {
+    return;
+  }
+
+  try {
+    await bluetooth.setScreenDimEnabled(enabled);
+  } catch (error) {
+    // [相容性]
+    // Bluefy API 呼叫失敗時不影響 BLE、RPM 或其他網站功能。
+    console.debug(
+      '[ScreenWakeLock] Bluefy screen dim control rejected:',
+      error,
+    );
+  }
+}
 
 async function requestScreenWakeLock(): Promise<void> {
   if (document.visibilityState !== 'visible' || wakeLockSentinel !== null) {
@@ -54,18 +109,34 @@ async function requestScreenWakeLock(): Promise<void> {
   }
 }
 
+// [修改] 統一啟用防休眠。
+// Bluefy 使用原生擴充 API；支援標準 Wake Lock 的瀏覽器同時取得 screen lock。
+function enableScreenWake(): void {
+  void setBluefyScreenDimEnabled(false);
+  void requestScreenWakeLock();
+}
+
 function handleVisibilityChange(): void {
   if (document.visibilityState === 'visible') {
-    // [新增] 從背景切回網頁後重新取得 Wake Lock。
-    void requestScreenWakeLock();
+    // [修改] 從背景切回網頁後，同時恢復 Bluefy 與標準 Wake Lock。
+    enableScreenWake();
+    return;
   }
+
+  // [新增] BRD 網頁不在前景時恢復允許螢幕休眠。
+  void setBluefyScreenDimEnabled(true);
 }
 
 function handleUserInteraction(): void {
-  // [新增]
+  // [修改]
   // 若瀏覽器首次開啟頁面時拒絕自動取得，
   // 在使用者觸控、滑鼠或鍵盤操作後再次嘗試。
-  void requestScreenWakeLock();
+  enableScreenWake();
+}
+
+function handlePageHide(): void {
+  // [新增] 離開 / 關閉 BRD 網頁時恢復 Bluefy 原本的螢幕休眠設定。
+  void setBluefyScreenDimEnabled(true);
 }
 
 export function initScreenWakeLock(): void {
@@ -75,16 +146,16 @@ export function initScreenWakeLock(): void {
 
   initialized = true;
 
-  // [新增] 網頁開啟後立即嘗試保持螢幕喚醒。
-  void requestScreenWakeLock();
+  // [修改] 網頁開啟後同時嘗試 Bluefy 與標準 Screen Wake Lock。
+  enableScreenWake();
 
-  // [新增] App / 分頁切回前景時重新取得。
+  // [修改] App / 分頁前景與背景切換時同步更新防休眠狀態。
   document.addEventListener(
     'visibilitychange',
     handleVisibilityChange,
   );
 
-  // [新增] 手機與電腦的使用者操作 fallback。
+  // [保留] 手機與電腦的使用者操作 fallback。
   window.addEventListener(
     'pointerdown',
     handleUserInteraction,
@@ -100,5 +171,11 @@ export function initScreenWakeLock(): void {
   window.addEventListener(
     'keydown',
     handleUserInteraction,
+  );
+
+  // [新增] 關閉頁面、重新整理或離開頁面時恢復 Bluefy 螢幕休眠。
+  window.addEventListener(
+    'pagehide',
+    handlePageHide,
   );
 }
